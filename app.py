@@ -21,15 +21,17 @@ def get_asset_path(relative_path):
 def load_local_image_base64(file_path):
     if os.path.exists(file_path):
         with open(file_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
-            return f"data:image/png;base64,{encoded_string}"
+            # 💡 [CRITICAL FIX] Header လုံးဝမပါဘဲ သန့်စင်ပြီးသား Base64 စာသားသက်သက်ကိုသာ ပို့ပေးခြင်း
+            return base64.b64encode(image_file.read()).decode()
     return ""
 
-# မိမိတို့အသုံးပြုမည့် Official Frame Background ပုံနှင့် Font ဖိုင်အား လှမ်းဖတ်ခြင်း
+# --- မိမိတို့အသုံးပြုမည့် Official Frame Background ပုံများနှင့် Font ဖိုင်အား လှမ်းဖတ်ခြင်း ---
 bg_image_path = get_asset_path("stand_bg.png")
+a4_bg_image_path = get_asset_path("a4_stand_bg.png")  # 🚨 [NEW] A4 Composite Frame ပုံလမ်းကြောင်း
 font_file_path = get_asset_path("MYANMAR ANGOUN REGULAR.TTF")
 
 FRAME_BACKGROUND = load_local_image_base64(bg_image_path)
+A4_FRAME_BACKGROUND = load_local_image_base64(a4_bg_image_path)  # 🚨 [NEW] A4 ပုံအား Base64 သို့ ပြောင်းလဲဖတ်ယူခြင်း
 
 # Custom Font ကို HTML/CSS ထဲတွင် တိုက်ရိုက်သုံးနိုင်ရန် Base64 ပြောင်းခြင်း
 FONT_BASE64 = ""
@@ -63,9 +65,9 @@ def get_qr_base64(qr_string):
     img.save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode()
 
-# --- HTML/CSS ဖြင့် Stand Base Frame ကို ပုံဖော်မည့် Function ---
+# --- HTML/CSS ဖြင့် Stand Base Frame ကို ပုံဖော်မည့် Function (Perfect Aspect-Ratio Lock) ---
 def build_stand_html(qr_base64, shop_name):
-    # Font embedded စနစ်အား ထည့်သွင်းခြင်း
+    global FRAME_BACKGROUND
     font_style_injection = ""
     if FONT_BASE64:
         font_style_injection = f"""
@@ -79,57 +81,15 @@ def build_stand_html(qr_base64, shop_name):
         
     return f"""
     {font_style_injection}
-    <div class="mmqr-print-frame" style="
-        width: 384px; 
-        height: 576px; 
-        background-image: url('{FRAME_BACKGROUND}'); 
-        background-size: cover;
-        background-position: center;
-        position: relative;
-        margin: 0 auto;
-        overflow: hidden;
-        page-break-after: always;
-        page-break-inside: avoid;
-    ">
-        <div style="
-            position: absolute;
-            top: 184px; 
-            left: 50%;
-            transform: translateX(-50%);
-            width: 215px; 
-            height: 215px;
-            background: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        ">
+    <div class="mmqr-print-frame" style="width: 384px; height: 576px; position: relative; overflow: hidden; box-sizing: border-box; margin: 0 auto; background: white;">
+        <img src="data:image/png;base64,{FRAME_BACKGROUND}" style="position: absolute; top: 0; left: 0; width: 384px; height: 576px; z-index: 1; object-fit: fill; display: block;"/>
+        
+        <div style="position: absolute; top: 184px; left: 50%; transform: translateX(-50%); width: 215px; height: 215px; background: white; display: flex; align-items: center; justify-content: center; overflow: hidden; z-index: 2;">
             <img src="data:image/png;base64,{qr_base64}" style="width: 98%; height: 98%; object-fit: contain;" />
         </div>
         
-        <div style="
-            position: absolute;
-            bottom: 102px; 
-            left: 0;
-            right: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            width: 100%;
-            height: 40px;
-        ">
-            <span style="
-                font-family: 'MyanmarAngoun', 'Segoe UI', Arial, sans-serif;
-                font-size: 20px;
-                font-weight: bold;
-                color: #FFB300;
-                letter-spacing: 0.8px;
-                text-transform: uppercase;
-                line-height: 1.2;
-                display: inline-block;
-                width: 90%;
-            ">
+        <div style="position: absolute; bottom: 102px; left: 0; right: 0; display: flex; align-items: center; justify-content: center; text-align: center; width: 100%; height: 40px; z-index: 2;">
+            <span style="font-family: 'MyanmarAngoun', 'Segoe UI', Arial, sans-serif; font-size: 20px; font-weight: bold; color: #FFB300; letter-spacing: 0.8px; text-transform: uppercase; line-height: 1.2; display: inline-block; width: 90%;">
                 {shop_name}
             </span>
         </div>
@@ -265,6 +225,12 @@ if qr_strings_list:
                     width: 4in;
                     height: 6in;
                 }
+                /* 🚨 [PRINT FIX] 4x6 ရိုးရိုးထုတ်ရာတွင်လည်း နောက်ခံ ပုံရိပ်ကို အတင်းအကျပ် ထည့်သွင်းခိုင်းခြင်း */
+                img {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    display: block !important;
+                }
             }
         </style>
         """
@@ -280,54 +246,184 @@ if qr_strings_list:
     if not FONT_BASE64:
         st.warning("⚠️ 'MYANMAR ANGOUN REGULAR.TTF' not found.")
         
-    # --- Navigation Buttons ---
+    # ==========================================
+    # 🖨️ Paper Size Options & Layout Selection
+    # ==========================================
+    st.markdown("---")
+    st.subheader("🖨️ Print Layout & Paper Options")
+    
+    paper_option = st.radio(
+        "အသုံးပြုမည့် စာရွက်နှင့် ပုံစံကို ရွေးချယ်ပါ :",
+        ("4x6 Paper (တစ်ခါလျှင် ၁ ဆိုင်သာ သီးသန့်ထုတ်မည်)", "A4 Paper (တစ်ခါလျှင် ၃ ဆိုင်တွဲ၍ ဒေါင်လိုက်ထုတ်မည်)"),
+        key="paper_layout_selection"
+    )
+
+    st.markdown("---")
+    st.subheader("🧭 Navigation & Preview")
+
+    # --- Navigation Buttons (နံပါတ်တိုက်ရိုက်ရိုက်ခြင်းနှင့် ညှိနှိုင်းထားသည်) ---
     col1, col2, col3 = st.columns([1, 2, 1])
     with col1:
-        if st.button("⬅️ Previous"):
+        if st.button("⬅️ Previous", use_container_width=True):
             if st.session_state.current_index > 0:
                 st.session_state.current_index -= 1
                 st.rerun()
     with col3:
-        if st.button("Next ➡️"):
+        if st.button("Next ➡️", use_container_width=True):
             if st.session_state.current_index < total_data - 1:
                 st.session_state.current_index += 1
                 st.rerun()
                 
     st.markdown("---")
-    st.subheader("🖨️ Print Options")
+    st.subheader("🖨️ Printing Process")
     
     print_col1, print_col2 = st.columns(2)
     
-    # Option 1: လက်ရှိပုံတစ်ပုံတည်းကို သီးသန့် iframe ဖြင့် ဖြတ်ထုတ်ခြင်း
+    # ==========================================
+    # 🖨️ Option ပေါ်မူတည်၍ Frame ပုံစံထုတ်ပေးမည့် Functions (Bug-Free Final Version)
+    # ==========================================
+
+    # ၁။ 4x6 မူရင်း Single Frame HTML
+    def build_4x6_stand_html(qr_base64, shop_name):
+        global FRAME_BACKGROUND
+        return f"""
+        <div class="mmqr-print-frame" style="width: 384px; height: 576px; position: relative; overflow: hidden; box-sizing: border-box; margin: 0 auto; page-break-after: always; background: white;">
+            <img src="data:image/png;base64,{FRAME_BACKGROUND}" style="position: absolute; top: 0; left: 0; width: 384px; height: 576px; z-index: 1; object-fit: fill; display: block;"/>
+            <div style="position: absolute; top: 184px; left: 50%; transform: translateX(-50%); width: 215px; height: 215px; background: white; display: flex; align-items: center; justify-content: center; overflow: hidden; z-index: 2;">
+                <img src="data:image/png;base64,{qr_base64}" style="width: 98%; height: 98%; object-fit: contain;" />
+            </div>
+            <div style="position: absolute; bottom: 102px; left: 0; right: 0; display: flex; align-items: center; justify-content: center; text-align: center; width: 100%; height: 40px; z-index: 2;">
+                <span style="font-family: 'MyanmarAngoun', 'Segoe UI', Arial, sans-serif; font-size: 20px; font-weight: bold; color: #FFB300; letter-spacing: 0.8px; text-transform: uppercase; line-height: 1.2; display: inline-block; width: 90%;">{shop_name}</span>
+            </div>
+        </div>
+        """
+
+    # ၂။ a4_stand_bg.png ပေါ်တွင် ၃ ဆိုင် ကွက်တိနေရာချမည့် Composite Function
+    def build_a4_composite_html(chunk_data):
+        global A4_FRAME_BACKGROUND
+        clean_a4_bg = str(A4_FRAME_BACKGROUND).replace("\n", "").replace("\r", "").strip() if A4_FRAME_BACKGROUND else ""
+
+        p1_qr, p1_name = (get_qr_base64(chunk_data[0]), parse_english_shop_name(chunk_data[0])) if len(chunk_data) >= 1 else ("", "")
+        p2_qr, p2_name = (get_qr_base64(chunk_data[1]), parse_english_shop_name(chunk_data[1])) if len(chunk_data) >= 2 else ("", "")
+        l3_qr, l3_name = (get_qr_base64(chunk_data[2]), parse_english_shop_name(chunk_data[2])) if len(chunk_data) >= 3 else ("", "")
+
+        p1_html = f"""
+        <div style="position: absolute; top: 0; left: 0; width: 560px; height: 840px; z-index: 2;">
+            <div style="position: absolute; top: 360px; left: 130px; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: transparent;">
+                <img src="data:image/png;base64,{p1_qr}" style="width: 100%; height: 100%; object-fit: contain;"/>
+            </div>
+            <div style="position: absolute; top: 722px; left: 0; width: 100%; text-align: center;">
+                <span style="font-family: 'MyanmarAngoun', sans-serif; font-size: 28px; font-weight: bold; color: #FFB300; text-transform: uppercase; display: inline-block; width: 90%; letter-spacing: 0.8px;">{p1_name}</span>
+            </div>
+        </div>
+        """ if p1_qr else ""
+
+  
+        p2_html = f"""
+        <div style="position: absolute; top: 0; left: 560px; width: 560px; height: 840px; z-index: 2;">
+            <div style="position: absolute; top: 360px; left: 130px; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: transparent;">
+                <img src="data:image/png;base64,{p2_qr}" style="width: 100%; height: 100%; object-fit: contain;"/>
+            </div>
+            <div style="position: absolute; top: 722px; left: 0; width: 100%; text-align: center;">
+                <span style="font-family: 'MyanmarAngoun', sans-serif; font-size: 28px; font-weight: bold; color: #FFB300; text-transform: uppercase; display: inline-block; width: 90%; letter-spacing: 0.8px;">{p2_name}</span>
+            </div>
+        </div>
+        """ if p2_qr else ""
+
+        
+        l3_html = f"""
+        <div style="position: absolute; top: 840px; left: 0; width: 1120px; height: 744px; z-index: 2; background: transparent;">
+            <div style="position: absolute; top: 225px; left: 410px; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; overflow: hidden; transform: rotate(90deg); transform-origin: center;">
+                <img src="data:image/png;base64,{l3_qr}" style="width: 100%; height: 100%; object-fit: contain;"/>
+            </div>
+            <div style="position: absolute; top: 0; left: 300px; width: 50px; height: 744px; display: flex; align-items: center; justify-content: center;">
+                <span style="font-family: 'MyanmarAngoun', sans-serif; font-size: 28px; font-weight: bold; color: #FFB300; text-transform: uppercase; letter-spacing: 0.8px; transform: rotate(90deg); transform-origin: center; white-space: nowrap; display: inline-block;">
+                    {l3_name}
+                </span>
+            </div>
+        </div>
+        """ if l3_qr else ""
+
+        return f"""
+        <div class="a4-page-box" style="width: 1120px; height: 1584px; position: relative; overflow: hidden; box-sizing: border-box; page-break-after: always; background: white;">
+            <img src="data:image/png;base64,{clean_a4_bg}" style="position: absolute; top: 0; left: 0; width: 1120px; height: 1584px; z-index: 1; object-fit: fill; display: block;"/>
+            {p1_html}
+            {p2_html}
+            {l3_html}
+        </div>
+        """
+
+    # ==========================================
+    # 🖨️ Printing Process Layout Engine
+    # ==========================================
+    print_col1, print_col2 = st.columns(2)
+    
+    # --- Option 1: Print Current ---
     with print_col1:
         if st.button("🖨️ Print Current", use_container_width=True):
+            current_html_content = ""
+            
+            if "A4" in paper_option:
+                start_idx = st.session_state.current_index
+                end_idx = min(start_idx + 3, total_data)
+                chunk = qr_strings_list[start_idx:end_idx]
+                current_html_content = build_a4_composite_html(chunk)
+                page_size_css = "A4 portrait"
+            else:
+                current_html_content = build_4x6_stand_html(current_qr_base64, display_shop_name)
+                page_size_css = "4in 6in"
+
             print_html = f"""
             <html>
-            <head>{iframe_print_style}</head>
-            <body>
-                {build_stand_html(current_qr_base64, display_shop_name)}
-                <script>
-                    window.onload = function() {{
-                        window.print();
+            <head>
+                {iframe_print_style}
+                <style>
+                    @font-face {{ font-family: 'MyanmarAngoun'; src: url(data:font/ttf;charset=utf-8;base64,{FONT_BASE64}) format('truetype'); }}
+                    @media print {{
+                        @page {{ size: {page_size_css}; margin: 0; }}
+                        body {{ margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+                        img {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; display: block !important; }}
                     }}
-                </script>
+                </style>
+            </head>
+            <body>
+                {current_html_content}
+                <script>window.onload = function() {{ window.print(); }}</script>
             </body>
             </html>
             """
             st.components.v1.html(print_html, height=0)
             
-    # Option 2: Data ရှိသမျှ အကုန်လုံးကို သီးသန့် iframe ဖြင့် စာရွက်ခွဲထုတ်ခြင်း
+    # --- Option 2: Print All ---
     with print_col2:
         if st.button("📚 Print All", use_container_width=True):
             all_stands_html = ""
-            for qrs in qr_strings_list:
-                s_name = parse_english_shop_name(qrs)
-                q_base = get_qr_base64(qrs)
-                all_stands_html += build_stand_html(q_base, s_name)
             
+            if "A4" in paper_option:
+                for i in range(0, total_data, 3):
+                    chunk = qr_strings_list[i:i+3]
+                    all_stands_html += build_a4_composite_html(chunk)
+                page_size_css = "A4 portrait"
+            else:
+                for qrs in qr_strings_list:
+                    s_name = parse_english_shop_name(qrs)
+                    q_base = get_qr_base64(qrs)
+                    all_stands_html += build_4x6_stand_html(q_base, s_name)
+                page_size_css = "4in 6in"
+
             bulk_print_html = f"""
             <html>
-            <head>{iframe_print_style}</head>
+            <head>
+                {iframe_print_style}
+                <style>
+                    @font-face {{ font-family: 'MyanmarAngoun'; src: url(data:font/ttf;charset=utf-8;base64,{FONT_BASE64}) format('truetype'); }}
+                    @media print {{
+                        @page {{ size: {page_size_css}; margin: 0; }}
+                        body {{ margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+                        img {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; display: block !important; }}
+                    }}
+                </style>
+            </head>
             <body>
                 {all_stands_html}
                 <script>
@@ -341,5 +437,5 @@ if qr_strings_list:
             st.components.v1.html(bulk_print_html, height=0)
             
 else:
-    st.info(" Input Data for view MMQR 4x6 Stand ")
+    st.info("Input Data for view MMQR 4x6 Stand")
 
