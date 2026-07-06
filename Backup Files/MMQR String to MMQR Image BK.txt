@@ -1,0 +1,189 @@
+import streamlit as st
+import qrcode
+import pandas as pd
+import base64
+import re
+import os
+from io import BytesIO
+
+# Page Configuration
+st.set_page_config(page_title="MMQR Official 4x6 Dashboard", layout="centered")
+st.title("🖨️ MMQR Official 4x6 Stand Viewer")
+
+# Local ပုံဖိုင်များကို HTML ထဲတွင် သုံးနိုင်ရန် Base64 ပြောင်းပေးသည့် Function
+def load_local_image_base64(file_path):
+    if os.path.exists(file_path):
+        with open(file_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+            return f"data:image/png;base64,{encoded_string}"
+    return ""
+
+# မိမိတို့အသုံးပြုမည့် Official Frame Background ပုံအား လှမ်းဖတ်ခြင်း
+bg_image_path = "stand_bg.png"
+FRAME_BACKGROUND = load_local_image_base64(bg_image_path)
+
+# MMQR String ထဲမှ ဆိုင်အမည်ကို အလိုအလျောက် ဖြတ်တောက်ယူမည့် စနစ်
+def parse_mmqr_data(qr_string):
+    shop_name_en = "MERCHANT SHOP"
+    shop_name_mm = ""
+    
+    match_en = re.search(r'59(\d{2})', qr_string)
+    if match_en:
+        length = int(match_en.group(1))
+        start_idx = match_en.end()
+        shop_name_en = qr_string[start_idx:start_idx+length].upper()
+        
+    match_mm_template = re.search(r'64\d{2}', qr_string)
+    if match_mm_template:
+        start_template = match_mm_template.end()
+        sub_string = qr_string[start_template:]
+        match_mm = re.search(r'01(\d{2})', sub_string)
+        if match_mm:
+            length_mm = int(match_mm.group(1))
+            start_mm_idx = match_mm.end()
+            shop_name_mm = sub_string[start_mm_idx:start_mm_idx+length_mm]
+
+    final_name = shop_name_mm if shop_name_mm else shop_name_en
+    return final_name
+
+# QR Code Generation Function (High Quality & Exact Box)
+def get_qr_base64(qr_string):
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=15, 
+        border=0, # Frame အဖြူကွက်ထဲ အတိအကျဝင်ရန် Border ကို 0 ထားပါသည်
+    )
+    qr.add_data(qr_string.strip())
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode()
+
+# Session State Index Management
+if 'current_index' not in st.session_state:
+    st.session_state.current_index = 0
+
+# Data Input Methods
+data_source = st.radio("Data ရယူမည့် နည်းလမ်းကို ရွေးချယ်ပါ -", ("Paste Text (စာသားရိုက်ထည့်ရန်)", "Google Sheet URL"))
+qr_strings_list = []
+
+if data_source == "Paste Text (စာသားရိုက်ထည့်ရန်)":
+    raw_text = st.text_area("QR Strings များကို Paste လုပ်ပါ (တစ်ကြောင်းလျှင် တစ်ခု) -", height=150)
+    if raw_text:
+        qr_strings_list = [line.strip() for line in raw_text.split("\n") if line.strip()]
+else:
+    sheet_url = st.text_input("Google Sheet Share Link ကို ထည့်ပါ :")
+    if sheet_url:
+        try:
+            if "edit?usp=sharing" in sheet_url or "edit#" in sheet_url:
+                csv_url = sheet_url.split('/edit')[0] + '/export?format=csv'
+            else:
+                csv_url = sheet_url
+            df = pd.read_csv(csv_url)
+            column_name = st.selectbox("QR String Column ကို ရွေးပါ -", df.columns)
+            qr_strings_list = df[column_name].dropna().astype(str).tolist()
+        except:
+            st.error("Google Sheet အား ဖတ်မရပါ။ Setting ကို စစ်ဆေးပါ။")
+
+# --- UI Render Logic ---
+if qr_strings_list:
+    total_data = len(qr_strings_list)
+    
+    if st.session_state.current_index >= total_data:
+        st.session_state.current_index = 0
+    if st.session_state.current_index < 0:
+        st.session_state.current_index = 0
+        
+    current_qr_string = qr_strings_list[st.session_state.current_index]
+    display_shop_name = parse_mmqr_data(current_qr_string)
+    
+    st.markdown("---")
+    st.subheader(f"📄 Data ပြသမှု: {st.session_state.current_index + 1} / {total_data}")
+    
+    if not FRAME_BACKGROUND:
+        st.error("⚠️ 'stand_bg.png' နောက်ခံပုံကို Folder ထဲတွင် ရှာမတွေ့ပါ။ ပုံထည့်သွင်းပေးရန် လိုအပ်ပါသည်။")
+        
+    try:
+        qr_base64 = get_qr_base64(current_qr_string)
+        
+        # 4x6 Photo Paper Scale ($101.6mm x 152.4mm) - ပိုမိုတိကျသော ဗားရှင်း
+        html_frame = f"""
+        <div style="
+            width: 384px; 
+            height: 576px; 
+            background-image: url('{FRAME_BACKGROUND}'); 
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            margin: auto;
+            overflow: hidden;
+            border: 1px solid #ccc;
+            box-shadow: 3px 3px 15px rgba(0,0,0,0.15);
+        ">
+            <div style="
+                position: absolute;
+                top: 182px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 215px; 
+                height: 215px;
+                background: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+            ">
+                <img src="data:image/png;base64,{qr_base64}" style="width: 98%; height: 98%; object-fit: contain;" />
+            </div>
+            
+            <div style="
+                position: absolute;
+                bottom: 102px; 
+                left: 0;
+                right: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                width: 100%;
+                height: 40px; /* စာသား၏ Height သတ်မှတ်ချက် */
+            ">
+                <span style="
+                    font-family: 'Segoe UI', Arial, 'Pyidaungsu', sans-serif;
+                    font-size: 21px;
+                    font-weight: bold;
+                    color: #FFB300; /* ဝါရွှေရောင်စာလုံး */
+                    letter-spacing: 0.5px;
+                    text-transform: uppercase;
+                    line-height: 1.2;
+                    display: inline-block;
+                    width: 90%; /* ဘေးဘောင်မကျော်စေရန် ဘောင်သတ်မှတ်ချက် */
+                ">
+                    {display_shop_name}
+                </span>
+            </div>
+        </div>
+        """
+        
+        st.components.v1.html(html_frame, height=590)
+        
+    except Exception as e:
+        st.error(f"ကုဒ် ပုံဖော်ရာတွင် အမှားရှိပါသည်။ အမှား: {str(e)}")
+        
+    # Navigation Buttons
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col1:
+        if st.button("⬅️ Previous"):
+            if st.session_state.current_index > 0:
+                st.session_state.current_index -= 1
+                st.rerun()
+    with col3:
+        if st.button("Next ➡️"):
+            if st.session_state.current_index < total_data - 1:
+                st.session_state.current_index += 1
+                st.rerun()
+else:
+    st.info("Form ပေါ်တွင် 4x6 စကေးအတိုင်း MMQR Official Stand မြင်တွေ့ရရန် အထက်တွင် Data ထည့်သွင်းပါ။")

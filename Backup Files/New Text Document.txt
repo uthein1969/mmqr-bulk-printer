@@ -1,0 +1,113 @@
+# ၂။ အသစ်ပေးပို့ထားသော a4_stand_bg.png ပေါ်တွင် ၃ ဆိုင် ကွက်တိနေရာချမည့် Composite Function
+
+    def build_a4_composite_html(chunk_data):
+
+        global A4_FRAME_BACKGROUND
+
+        clean_a4_bg = str(A4_FRAME_BACKGROUND).replace("\n", "").replace("\r", "").strip() if A4_FRAME_BACKGROUND else ""
+
+
+
+        p1_qr, p1_name = (get_qr_base64(chunk_data[0]), parse_english_shop_name(chunk_data[0])) if len(chunk_data) >= 1 else ("", "")
+
+        p2_qr, p2_name = (get_qr_base64(chunk_data[1]), parse_english_shop_name(chunk_data[1])) if len(chunk_data) >= 2 else ("", "")
+
+        l3_qr, l3_name = (get_qr_base64(chunk_data[2]), parse_english_shop_name(chunk_data[2])) if len(chunk_data) >= 3 else ("", "")
+
+
+
+        # 🔒 [PORTRAIT LOCK] အပေါ်ဘက် ဒေါင်လိုက် နှစ်ခုအား အဆင်ပြေပြီးသားအတိုင်း သေသေချာချာ ပိတ်ထားပါသည်
+
+        p1_html = f"""
+
+        <div style="position: absolute; top: 0; left: 0; width: 560px; height: 840px; z-index: 2;">
+
+            <div style="position: absolute; top: 350px; left: 125px; width: 310px; height: 310px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: transparent;">
+
+                <img src="data:image/png;base64,{p1_qr}" style="width: 100%; height: 100%; object-fit: contain;"/>
+
+            </div>
+
+            <div style="position: absolute; top: 722px; left: 0; width: 100%; text-align: center;">
+
+                <span style="font-family: 'MyanmarAngoun', sans-serif; font-size: 28px; font-weight: bold; color: #FFB300; text-transform: uppercase; display: inline-block; width: 90%; letter-spacing: 0.8px;">{p1_name}</span>
+
+            </div>
+
+        </div>
+
+        """ if p1_qr else ""
+
+
+
+        p2_html = f"""
+
+        <div style="position: absolute; top: 0; left: 560px; width: 560px; height: 840px; z-index: 2;">
+
+            <div style="position: absolute; top: 350px; left: 125px; width: 310px; height: 310px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: transparent;">
+
+                <img src="data:image/png;base64,{p2_qr}" style="width: 100%; height: 100%; object-fit: contain;"/>
+
+            </div>
+
+            <div style="position: absolute; top: 722px; left: 0; width: 100%; text-align: center;">
+
+                <span style="font-family: 'MyanmarAngoun', sans-serif; font-size: 28px; font-weight: bold; color: #FFB300; text-transform: uppercase; display: inline-block; width: 90%; letter-spacing: 0.8px;">{p2_name}</span>
+
+            </div>
+
+        </div>
+
+        """ if p2_qr else ""
+
+
+
+        # 🚨 [LANDSCAPE ORIENTATION FIXED] ဆိုင်နာမည်အား QR ၏ အောက်ခြေ အဝါရောင်စာသားကွက်ပေါ်သို့ ရောက်ရှိစေရန် ဝင်ရိုးအမှန်ပြင်ဆင်ချက်
+
+        l3_html = f"""
+
+        <div style="position: absolute; top: 840px; left: 0; width: 1120px; height: 744px; z-index: 2; background: transparent;">
+
+           
+
+            <div style="position: absolute; top: 215px; left: 410px; width: 290px; height: 310px; display: flex; align-items: center; justify-content: center; overflow: hidden; transform: rotate(90deg); transform-origin: center;">
+
+                <img src="data:image/png;base64,{l3_qr}" style="width: 100%; height: 100%; object-fit: contain;"/>
+
+            </div>
+
+           
+
+            <div style="position: absolute; top: 0; left: 300px; width: 50px; height: 744px; display: flex; align-items: center; justify-content: center;">
+
+                <span style="font-family: 'MyanmarAngoun', sans-serif; font-size: 28px; font-weight: bold; color: #FFB300; text-transform: uppercase; letter-spacing: 0.8px; transform: rotate(90deg); transform-origin: center; white-space: nowrap; display: inline-block;">
+
+                    {l3_name}
+
+                </span>
+
+            </div>
+
+           
+
+        </div>
+
+        """ if l3_qr else ""
+
+
+
+        return f"""
+
+        <div class="a4-page-box" style="width: 1120px; height: 1584px; position: relative; overflow: hidden; box-sizing: border-box; page-break-after: always; background: white;">
+
+            <img src="data:image/png;base64,{clean_a4_bg}" style="position: absolute; top: 0; left: 0; width: 1120px; height: 1584px; z-index: 1; object-fit: fill; display: block;"/>
+
+            {p1_html}
+
+            {p2_html}
+
+            {l3_html}
+
+        </div>
+
+        """
