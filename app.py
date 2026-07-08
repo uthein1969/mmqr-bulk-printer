@@ -309,7 +309,7 @@ if qr_strings_list:
 
         p1_html = f"""
         <div style="position: absolute; top: 0; left: 0; width: 560px; height: 840px; z-index: 2;">
-            <div style="position: absolute; top: 360px; left: 130px; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: transparent;">
+            <div style="position: absolute; top: 365px; left: 130px; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: transparent;">
                 <img src="data:image/png;base64,{p1_qr}" style="width: 100%; height: 100%; object-fit: contain;"/>
             </div>
             <div style="position: absolute; top: 722px; left: 0; width: 100%; text-align: center;">
@@ -321,7 +321,7 @@ if qr_strings_list:
   
         p2_html = f"""
         <div style="position: absolute; top: 0; left: 560px; width: 560px; height: 840px; z-index: 2;">
-            <div style="position: absolute; top: 360px; left: 130px; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: transparent;">
+            <div style="position: absolute; top: 365px; left: 130px; width: 300px; height: 300px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: transparent;">
                 <img src="data:image/png;base64,{p2_qr}" style="width: 100%; height: 100%; object-fit: contain;"/>
             </div>
             <div style="position: absolute; top: 722px; left: 0; width: 100%; text-align: center;">
